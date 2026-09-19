@@ -9,10 +9,13 @@
 <body>
 <header class="site-header">
   <h1>Student Exams</h1>
-  <a class="button ghost" href="admin.html">Admin</a>
+  <div style="display:flex; gap:8px;">
+    <a class="button ghost" href="admin.html">Admin</a>
+    <button class="button ghost" type="button" onclick="logoutAdmin()">Log out</button>
+  </div>
 </header>
 
-<main class="container">
+<main class="container" id="listRoot" hidden>
   <div class="toolbar">
     <input type="search" id="search" placeholder="Search exams…" />
     <label class="sort-label">
@@ -31,7 +34,10 @@
 </main>
 
 <script src="assets/app.js"></script>
+<script src="assets/auth.js"></script>
 <script>
+  requireAdminAuth(document.getElementById('listRoot'));
+
   let allExams = [];
 
   function copyIconSvg() {
@@ -66,7 +72,7 @@
       card.innerHTML = `
         <div class="exam-card-main">
           <h2 class="exam-name">${escapeHtml(exam.name)}</h2>
-          <p class="exam-date">${formatDate(exam.createdAt)}</p>
+          <p class="exam-date">${formatDate(exam.createdAt)} · <span class="device-count" data-count-for="${exam.id}">— devices</span></p>
         </div>
         <div class="exam-card-actions">
           <a class="button" href="${examViewUrl(exam.id)}">Open</a>
@@ -77,6 +83,10 @@
         </div>
       `;
       list.appendChild(card);
+      getDeviceCount(exam.id).then((count) => {
+        const el = card.querySelector(`[data-count-for="${exam.id}"]`);
+        if (el) el.textContent = count === null ? 'count unavailable' : `${count} device${count === 1 ? '' : 's'}`;
+      });
     }
 
     list.querySelectorAll('.copy-btn').forEach((btn) => {
