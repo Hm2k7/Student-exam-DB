@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sample Algebra Quiz</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 1.4rem; }
+  .question { margin-bottom: 24px; }
+  .question p { font-weight: 600; }
+  label { display: block; margin: 6px 0; cursor: pointer; }
+  button { padding: 10px 18px; font-size: 1rem; cursor: pointer; }
+  #result { margin-top: 20px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Sample Algebra Quiz</h1>
+  <p>This is an example exam file. Drop any self-contained .html file like this one into the Admin panel to publish it.</p>
+
+  <form id="quiz">
+    <div class="question">
+      <p>1. What is 7 + 5?</p>
+      <label><input type="radio" name="q1" value="a" /> 10</label>
+      <label><input type="radio" name="q1" value="b" /> 11</label>
+      <label><input type="radio" name="q1" value="c" /> 12</label>
+    </div>
+
+    <div class="question">
+      <p>2. Solve for x: 2x = 10</p>
+      <label><input type="radio" name="q2" value="a" /> x = 2</label>
+      <label><input type="radio" name="q2" value="b" /> x = 5</label>
+      <label><input type="radio" name="q2" value="c" /> x = 20</label>
+    </div>
+
+    <button type="submit">Submit</button>
+  </form>
+  <p id="result"></p>
+
+  <script>
+    const answers = { q1: 'c', q2: 'b' };
+    document.getElementById('quiz').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      let score = 0;
+      for (const key in answers) {
+        const selected = form.querySelector(`input[name="${key}"]:checked`);
+        if (selected && selected.value === answers[key]) score++;
+      }
+      document.getElementById('result').textContent = `You scored ${score} / ${Object.keys(answers).length}`;
+    });
+  </script>
+</body>
+</html>
