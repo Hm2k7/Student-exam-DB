@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — Student Exams</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <h1>Admin</h1>
+  <a class="button ghost" href="index.html">&larr; Back to exams</a>
+</header>
+
+<main class="container">
+  <section class="panel">
+    <h2>1. Connect your project folder</h2>
+    <p class="hint">
+      Select the root folder of this project (the one containing <code>index.html</code>).
+      This lets the admin panel save exam files and update the exam list directly on disk.
+      Requires a Chromium browser (Chrome or Edge) served over <code>http://localhost</code> — see the README.
+    </p>
+    <button id="connectBtn" class="button">Connect folder</button>
+    <span id="connectStatus" class="status"></span>
+  </section>
+
+  <section class="panel" id="uploadPanel" hidden>
+    <h2>2. Add an exam</h2>
+    <form id="examForm">
+      <label class="field">
+        Exam name
+        <input type="text" id="examName" name="examName" placeholder="e.g. Algebra Quiz 1" required />
+      </label>
+
+      <label class="field">
+        Exam HTML file
+        <div id="dropZone" class="drop-zone">
+          <p>Drag &amp; drop an .html file here, or click to browse</p>
+          <input type="file" id="examFile" accept=".html,text/html" hidden />
+          <p id="fileName" class="file-name"></p>
+        </div>
+      </label>
+
+      <button type="submit" class="button primary">Add exam</button>
+    </form>
+    <p id="formStatus" class="status"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Existing exams</h2>
+    <div class="toolbar">
+      <select id="adminSort">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="name-asc">Name (A–Z)</option>
+        <option value="name-desc">Name (Z–A)</option>
+      </select>
+    </div>
+    <div id="adminList" class="exam-grid"></div>
+    <p id="adminEmpty" class="empty-state" hidden>No exams yet.</p>
+  </section>
+</main>
+
+<script src="assets/app.js"></script>
+<script src="assets/fs-store.js"></script>
+<script>
+  let dirHandle = null;
+  let manifest = [];
+  let selectedFile = null;
+
+  const supportsFsApi = 'showDirectoryPicker' in window;
+
+  async function refreshManifestFromDisk() {
+    const dataDir = await getSubDir(dirHandle, 'data');
+    const text = await readTextFile(dataDir, 'exams.json');
+    manifest = text ? JSON.parse(text) : [];
+  }
+
+  async function saveManifestToDisk() {
+    const dataDir = await getSubDir(dirHandle, 'data');
+    await writeTextFile(dataDir, 'exams.json', JSON.stringify(manifest, null, 2));
+  }
+
+  function copyIconSvg() {
+    return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderAdminList() {
+    const mode = document.getElementById('adminSort').value;
+    const list = document.getElementById('adminList');
+    const empty = document.getElementById('adminEmpty');
+    const sorted = sortExams(manifest, mode);
+    list.innerHTML = '';
+    if (sorted.length === 0) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    for (const exam of sorted) {
+      const card = document.createElement('div');
+      card.className = 'exam-card';
+      card.innerHTML = `
+        <div class="exam-card-main">
+          <h2 class="exam-name">${escapeHtml(exam.name)}</h2>
+          <p class="exam-date">${formatDate(exam.createdAt)}</p>
+        </div>
+        <div class="exam-card-actions">
+          <a class="button" href="${examViewUrl(exam.id)}" target="_blank" rel="noopener">Open</a>
+          <button class="icon-button copy-btn" type="button" data-id="${exam.id}" title="Copy link">
+            ${copyIconSvg()}<span>Copy link</span>
+          </button>
+          <button class="icon-button danger delete-btn" type="button" data-id="${exam.id}" title="Delete">Delete</button>
+        </div>
+      `;
+      list.appendChild(card);
+    }
+    list.querySelectorAll('.copy-btn').forEach((btn) => {
+      btn.addEventListener('click', () => copyText(absoluteUrl(examViewUrl(btn.dataset.id)), btn));
+    });
+    list.querySelectorAll('.delete-btn').forEach((btn) => {
+      btn.addEventListener('click', () => deleteExam(btn.dataset.id));
+    });
+  }
+
+  async function deleteExam(id) {
+    if (!confirm('Delete this exam? This cannot be undone.')) return;
+    const exam = manifest.find((e) => e.id === id);
+    if (!exam) return;
+    const examsDir = await getSubDir(dirHandle, 'exams');
+    await deleteFile(examsDir, exam.filename);
+    manifest = manifest.filter((e) => e.id !== id);
+    await saveManifestToDisk();
+    renderAdminList();
+  }
+
+  async function connectFolder() {
+    const statusEl = document.getElementById('connectStatus');
+    if (!supportsFsApi) {
+      statusEl.textContent = 'Your browser does not support the File System Access API. Use Chrome or Edge over http://localhost.';
+      return;
+    }
+    try {
+      dirHandle = await getOrPickProjectDirectory();
+      statusEl.textContent = `Connected to "${dirHandle.name}"`;
+      document.getElementById('uploadPanel').hidden = false;
+      await refreshManifestFromDisk();
+      renderAdminList();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Could not connect to folder: ' + err.message;
+    }
+  }
+
+  document.getElementById('connectBtn').addEventListener('click', connectFolder);
+
+  (async () => {
+    if (!supportsFsApi) {
+      document.getElementById('connectStatus').textContent = 'File System Access API not supported in this browser.';
+      return;
+    }
+    const saved = await getSavedDirHandle();
+    if (saved) {
+      const ok = await verifyPermission(saved, 'readwrite');
+      if (ok) {
+        dirHandle = saved;
+        document.getElementById('connectStatus').textContent = `Connected to "${dirHandle.name}"`;
+        document.getElementById('uploadPanel').hidden = false;
+        await refreshManifestFromDisk();
+        renderAdminList();
+      }
+    }
+  })();
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('examFile');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+      setSelectedFile(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) setSelectedFile(fileInput.files[0]);
+  });
+
+  function setSelectedFile(file) {
+    if (!file.name.toLowerCase().endsWith('.html') && file.type !== 'text/html') {
+      alert('Please select an .html file.');
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('fileName').textContent = file.name;
+  }
+
+  document.getElementById('examForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById('formStatus');
+    const name = document.getElementById('examName').value.trim();
+    if (!name) {
+      statusEl.textContent = 'Please enter an exam name.';
+      return;
+    }
+    if (!selectedFile) {
+      statusEl.textContent = 'Please choose an .html file.';
+      return;
+    }
+    if (!dirHandle) {
+      statusEl.textContent = 'Please connect the project folder first.';
+      return;
+    }
+
+    try {
+      statusEl.textContent = 'Saving…';
+      const contents = await selectedFile.text();
+      const now = new Date();
+      const id = `${slugify(name)}-${now.getTime()}`;
+      const filename = `${id}.html`;
+
+      const examsDir = await getSubDir(dirHandle, 'exams');
+      await writeTextFile(examsDir, filename, contents);
+
+      manifest.push({ id, name, filename, createdAt: now.toISOString() });
+      await saveManifestToDisk();
+
+      statusEl.textContent = `Added "${name}".`;
+      document.getElementById('examForm').reset();
+      document.getElementById('fileName').textContent = '';
+      selectedFile = null;
+      renderAdminList();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Error saving exam: ' + err.message;
+    }
+  });
+
+  document.getElementById('adminSort').addEventListener('change', renderAdminList);
+</script>
+</body>
+</html>

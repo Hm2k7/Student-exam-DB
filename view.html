@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Exam</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body class="viewer-body">
+<div class="viewer-toolbar">
+  <a class="button ghost small" href="index.html">&larr; All exams</a>
+  <h1 id="examTitle" class="viewer-title">Loading…</h1>
+  <button id="copyBtn" class="icon-button copy-btn" type="button" title="Copy link">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+    <span>Copy link</span>
+  </button>
+</div>
+<div id="frameWrap" class="viewer-frame-wrap">
+  <iframe id="examFrame" class="viewer-frame" title="Exam content"></iframe>
+</div>
+<p id="notFound" class="empty-state" hidden>Exam not found. It may have been removed.</p>
+
+<script src="assets/app.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+
+  loadManifest().then((data) => {
+    const exam = data.find((e) => e.id === id);
+    if (!exam) {
+      document.getElementById('examTitle').textContent = 'Exam not found';
+      document.getElementById('frameWrap').hidden = true;
+      document.getElementById('notFound').hidden = false;
+      document.getElementById('copyBtn').hidden = true;
+      return;
+    }
+    document.title = exam.name + ' — Exam';
+    document.getElementById('examTitle').textContent = exam.name;
+    document.getElementById('examFrame').src = `exams/${exam.filename}`;
+
+    document.getElementById('copyBtn').addEventListener('click', (e) => {
+      copyText(window.location.href, e.currentTarget);
+    });
+  });
+</script>
+</body>
+</html>

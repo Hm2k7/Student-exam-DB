@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Exams</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<header class="site-header">
+  <h1>Student Exams</h1>
+  <a class="button ghost" href="admin.html">Admin</a>
+</header>
+
+<main class="container">
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Search exams…" />
+    <label class="sort-label">
+      Sort by
+      <select id="sort">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="name-asc">Name (A–Z)</option>
+        <option value="name-desc">Name (Z–A)</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="list" class="exam-grid"></div>
+  <p id="empty" class="empty-state" hidden>No exams yet. Add one from the Admin page.</p>
+</main>
+
+<script src="assets/app.js"></script>
+<script>
+  let allExams = [];
+
+  function copyIconSvg() {
+    return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function render() {
+    const term = document.getElementById('search').value.trim().toLowerCase();
+    const mode = document.getElementById('sort').value;
+    let filtered = allExams.filter((e) => e.name.toLowerCase().includes(term));
+    filtered = sortExams(filtered, mode);
+
+    const list = document.getElementById('list');
+    const empty = document.getElementById('empty');
+    list.innerHTML = '';
+
+    if (filtered.length === 0) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    for (const exam of filtered) {
+      const card = document.createElement('div');
+      card.className = 'exam-card';
+      card.innerHTML = `
+        <div class="exam-card-main">
+          <h2 class="exam-name">${escapeHtml(exam.name)}</h2>
+          <p class="exam-date">${formatDate(exam.createdAt)}</p>
+        </div>
+        <div class="exam-card-actions">
+          <a class="button" href="${examViewUrl(exam.id)}">Open</a>
+          <button class="icon-button copy-btn" type="button" title="Copy link" data-id="${exam.id}">
+            ${copyIconSvg()}
+            <span>Copy link</span>
+          </button>
+        </div>
+      `;
+      list.appendChild(card);
+    }
+
+    list.querySelectorAll('.copy-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = absoluteUrl(examViewUrl(btn.dataset.id));
+        copyText(url, btn);
+      });
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('sort').addEventListener('change', render);
+
+  loadManifest().then((data) => {
+    allExams = data;
+    render();
+  });
+</script>
+</body>
+</html>
